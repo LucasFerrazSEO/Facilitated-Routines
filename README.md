@@ -1,2 +1,2 @@
 # Facilitated Routines
- Plugin WP: Automate repetitive tasks and optimize your Wordpress
+ Plugin WP to Automate repetitive tasks and optimize your Wordpress
