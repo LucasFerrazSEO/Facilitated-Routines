@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Facilitated Routines
  * Description: Automatize tarefas repetitivas e otimize seu Wordpress
- * Version:     1.6.0
+ * Version:     1.6.1
  * Author:      Lucas Ferraz SEO
  * Author URI:  https://lucasferrazseo.com
  * Requires at least: 6.8.2
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 define( 'FACILITATED_ROUTINES_MIN_WP',  '6.8.2' );
 define( 'FACILITATED_ROUTINES_MIN_PHP', '8.0' );
-define( 'FACILITATED_ROUTINES_VERSION', '1.6.0' );
+define( 'FACILITATED_ROUTINES_VERSION', '1.6.1' );
 
 function facilitated_routines_requirements_met() {
     global $wp_version;
@@ -60,7 +60,7 @@ function facilitated_routines_admin_notice() {
 }
 add_action( 'admin_notices', 'facilitated_routines_admin_notice' );
 
-// i18n: EN default; pt_BR when site is pt_BR; es_ES when Spanish; fallback EN otherwise
+// Idiomas: EN default; pt_BR quando WP em pt_BR; es_ES quando WP em espanhol; demais usam EN
 add_action( 'plugins_loaded', function() {
     $domain   = 'facilitated-routines';
     $lang_dir = plugin_dir_path( __FILE__ ) . 'languages/';
@@ -86,20 +86,28 @@ if ( ! facilitated_routines_requirements_met() ) { return; }
 final class Facilitated_Routines {
     const OPTION_GROUP                 = 'facilitated_routines';
     const OPTION_KEY_RENAME_ON_UPLOAD  = 'facilitated_routines_rename_on_upload'; // default 1
-    const OPTION_KEY_GH_TOKEN          = 'facilitated_routines_github_token';     // optional
     const OPTION_KEY_AUTO_UPDATE       = 'facilitated_routines_auto_update';      // default 1
 
     const GITHUB_OWNER = 'LucasFerrazSEO';
     const GITHUB_REPO  = 'Facilitated-Routines';
 
     public function __construct() {
+        // Link de configurações na lista de plugins
         add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_settings_link' ] );
+
+        // Página e campos de configurações
         add_action( 'admin_menu',  [ $this, 'register_settings_page' ] );
         add_action( 'admin_init',  [ $this, 'register_settings' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
+        // Ajax para renomeação em massa
         add_action( 'wp_ajax_facilitated_routines_prepare_bulk', [ $this, 'ajax_prepare_bulk' ] );
         add_action( 'wp_ajax_facilitated_routines_process_bulk', [ $this, 'ajax_process_bulk' ] );
+
+        // Renomear ao publicar ou atualizar
         add_action( 'save_post', [ $this, 'rename_featured_on_save' ], 20, 3 );
+
+        // Atualizações automáticas via GitHub Releases sem uso de token
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_for_update' ] );
         add_filter( 'plugins_api', [ $this, 'plugins_api' ], 10, 3 );
         add_filter( 'auto_update_plugin', [ $this, 'maybe_auto_update' ], 10, 2 );
@@ -118,13 +126,10 @@ final class Facilitated_Routines {
             'Accept'     => 'application/vnd.github+json',
             'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url(),
         ];
-        $token = (string) get_option( self::OPTION_KEY_GH_TOKEN, '' );
-        if ( $token !== '' ) {
-            $headers['Authorization'] = 'token ' . $token;
-        }
 
         $response = wp_remote_get( $url, [ 'headers' => $headers, 'timeout' => 15 ] );
         if ( is_wp_error( $response ) ) { return null; }
+
         $code = (int) wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) { return null; }
 
@@ -139,7 +144,7 @@ final class Facilitated_Routines {
             foreach ( $data['assets'] as $asset ) {
                 if ( ! empty( $asset['browser_download_url'] ) && is_string( $asset['browser_download_url'] ) ) {
                     $name = isset( $asset['name'] ) ? (string) $asset['name'] : '';
-                    if ( $name === 'facilitated-routines.zip' or (substr(strtolower($asset['browser_download_url']), -4) == '.zip') ) {
+                    if ( $name === 'facilitated-routines.zip' || ( substr( strtolower( $asset['browser_download_url'] ), -4 ) === '.zip' ) ) {
                         $package = $asset['browser_download_url'];
                         break;
                     }
@@ -163,8 +168,10 @@ final class Facilitated_Routines {
 
     public function check_for_update( $transient ) {
         if ( empty( $transient->checked ) ) { return $transient; }
+
         $release = $this->get_latest_release();
         if ( ! $release || empty( $release['version'] ) ) { return $transient; }
+
         $current = FACILITATED_ROUTINES_VERSION;
         if ( version_compare( $release['version'], $current, '<=' ) ) { return $transient; }
 
@@ -178,6 +185,7 @@ final class Facilitated_Routines {
             'url'         => 'https://github.com/' . self::GITHUB_OWNER . '/' . self::GITHUB_REPO,
             'package'     => $release['package'],
         ];
+
         $transient->response[ $plugin_file ] = $obj;
         return $transient;
     }
@@ -185,8 +193,10 @@ final class Facilitated_Routines {
     public function plugins_api( $res, $action, $args ) {
         if ( $action !== 'plugin_information' ) { return $res; }
         if ( empty( $args->slug ) || $args->slug !== 'facilitated-routines' ) { return $res; }
+
         $release = $this->get_latest_release();
         if ( ! $release ) { return $res; }
+
         $info = (object) [
             'name'          => __( 'Facilitated Routines', 'facilitated-routines' ),
             'slug'          => 'facilitated-routines',
@@ -213,7 +223,7 @@ final class Facilitated_Routines {
         return $update;
     }
 
-    /* =================== Rename only on publish/update =================== */
+    /* =================== Renomear somente ao publicar ou atualizar =================== */
     public function rename_featured_on_save( $post_id, $post, $update ) {
         if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) { return; }
         if ( wp_is_post_revision( $post_id ) ) { return; }
@@ -228,7 +238,7 @@ final class Facilitated_Routines {
         $this->rename_attachment_to_post_title( $thumb_id, $post_id );
     }
 
-    /* =================== Settings =================== */
+    /* =================== Configurações =================== */
     public function add_settings_link( $links ) {
         $url = admin_url( 'options-general.php?page=facilitated-routines' );
         $text = esc_html__( 'Settings', 'facilitated-routines' );
@@ -255,10 +265,6 @@ final class Facilitated_Routines {
             'type' => 'boolean', 'default' => 1,
             'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
         ] );
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_GH_TOKEN, [
-            'type' => 'string', 'default' => '',
-            'sanitize_callback' => function( $v ){ return sanitize_text_field( (string) $v ); }
-        ] );
 
         add_settings_section( 'fr_main', __( 'Settings', 'facilitated-routines' ), '__return_false', 'facilitated-routines' );
         add_settings_field(
@@ -273,12 +279,6 @@ final class Facilitated_Routines {
             [ $this, 'render_auto_update_field' ],
             'facilitated-routines', 'fr_main'
         );
-        add_settings_field(
-            self::OPTION_KEY_GH_TOKEN,
-            __( 'GitHub token (optional)', 'facilitated-routines' ),
-            [ $this, 'render_token_field' ],
-            'facilitated-routines', 'fr_main'
-        );
     }
 
     public function render_toggle_field() {
@@ -290,11 +290,6 @@ final class Facilitated_Routines {
         $enabled = (int) get_option( self::OPTION_KEY_AUTO_UPDATE, 1 );
         echo '<label><input type="checkbox" name="'.esc_attr(self::OPTION_KEY_AUTO_UPDATE).'" value="1" '.checked(1, $enabled, false).' /> ';
         echo esc_html__( 'Allow WordPress to auto install new releases from GitHub.', 'facilitated-routines' ) . '</label>';
-    }
-    public function render_token_field() {
-        $token = esc_attr( (string) get_option( self::OPTION_KEY_GH_TOKEN, '' ) );
-        echo '<input type="text" name="'.esc_attr(self::OPTION_KEY_GH_TOKEN).'" value="'.$token.'" class="regular-text" placeholder="ghp_xxxx..." />';
-        echo '<p class="description">'.esc_html__( 'Optional. Avoids rate limits when many sites check for updates.', 'facilitated-routines' ).'</p>';
     }
 
     public function enqueue_assets( $hook ) {
@@ -456,7 +451,7 @@ final class Facilitated_Routines {
         ) );
     }
 
-    /* =================== Rename core =================== */
+    /* =================== Núcleo de renomeação =================== */
     private function rename_attachment_to_post_title( $attachment_id, $parent_post_id ) {
         $file_path = get_attached_file( $attachment_id );
         if ( ! $file_path || ! file_exists( $file_path ) ) { return 'skip'; }
