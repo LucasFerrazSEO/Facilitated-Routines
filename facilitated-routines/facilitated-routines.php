@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Facilitated Routines
  * Description: Automatize tarefas repetitivas e otimize seu Wordpress
- * Version:     1.7.2
+ * Version:     1.7.6
  * Author:      Lucas Ferraz SEO
  * Author URI:  https://lucasferrazseo.com
  * Requires at least: 6.8.2
@@ -15,36 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 define( 'FACILITATED_ROUTINES_MIN_WP',  '6.8.2' );
 define( 'FACILITATED_ROUTINES_MIN_PHP', '8.0' );
-define( 'FACILITATED_ROUTINES_VERSION', '1.7.2' );
-
-add_action( 'plugins_loaded', function() {
-    $domain   = 'facilitated-routines';
-    $lang_dir = plugin_dir_path( __FILE__ ) . 'languages/';
-    $locale   = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
-    if ( 'pt_BR' === $locale ) {
-        $mofile = $lang_dir . $domain . '-pt_BR.mo';
-        if ( file_exists( $mofile ) ) { load_textdomain( $domain, $mofile ); }
-        return;
-    }
-    if ( 0 === strpos( $locale, 'es' ) ) {
-        $mofile = $lang_dir . $domain . '-es_ES.mo';
-        if ( file_exists( $mofile ) ) { load_textdomain( $domain, $mofile ); }
-        return;
-    }
-} );
-
-if ( version_compare( PHP_VERSION, FACILITATED_ROUTINES_MIN_PHP, '<' ) || ( isset( $GLOBALS['wp_version'] ) && version_compare( $GLOBALS['wp_version'], FACILITATED_ROUTINES_MIN_WP, '<' ) ) ) {
-    add_action( 'admin_notices', function() {
-        printf('<div class="notice notice-error"><p><strong>%s</strong> %s</p></div>',
-            esc_html__( 'Facilitated Routines', 'facilitated-routines' ),
-            sprintf( esc_html__( 'requires WordPress %1$s and PHP %2$s.', 'facilitated-routines' ),
-                esc_html( FACILITATED_ROUTINES_MIN_WP ),
-                esc_html( FACILITATED_ROUTINES_MIN_PHP )
-            )
-        );
-    } );
-    return;
-}
+define( 'FACILITATED_ROUTINES_VERSION', '1.7.6' );
 
 final class Facilitated_Routines {
     const OPTION_GROUP                 = 'facilitated_routines';
@@ -57,21 +28,87 @@ final class Facilitated_Routines {
     const GITHUB_OWNER = 'LucasFerrazSEO';
     const GITHUB_REPO  = 'Facilitated-Routines';
 
+    private static $locale = 'en_US';
+    private static $map_pt = array(
+        'Facilitated Routines' => 'Rotinas facilitadas',
+        'Settings' => 'Configurações',
+        'Rename images on upload' => 'Renomear imagens no upload',
+        'When checked, uploaded images will be renamed when the post is published or updated.' => 'Quando marcado, as imagens enviadas serão renomeadas ao publicar ou atualizar o post.',
+        'Save changes' => 'Salvar alterações',
+        'Bulk rename' => 'Renomear em massa',
+        'Renames the featured image files of all posts to the slug of each post title, with progress.' => 'Renomeia os arquivos da imagem destacada de todos os posts para o slug do título, com progresso.',
+        'Preparing...' => 'Preparando...',
+        'completed' => 'concluído',
+        'Failed to prepare processing.' => 'Falha ao preparar o processamento.',
+        'Failed to process batch.' => 'Falha ao processar o lote.',
+        'AJAX request error.' => 'Erro na requisição AJAX.',
+        'Nothing to process.' => 'Nada a processar.',
+        'Processed' => 'Processados',
+        'of' => 'de',
+        'Renamed' => 'Renomeados',
+        'Skipped' => 'Ignorados',
+        'Errors' => 'Erros',
+        'requires WordPress %1$s and PHP %2$s.' => 'requer WordPress %1$s e PHP %2$s.',
+        'Automated updates via GitHub Releases.' => 'Atualizações automatizadas via GitHub Releases.'
+    );
+    private static $map_es = array(
+        'Facilitated Routines' => 'Rutinas facilitadas',
+        'Settings' => 'Ajustes',
+        'Rename images on upload' => 'Renombrar imágenes al subir',
+        'When checked, uploaded images will be renamed when the post is published or updated.' => 'Si está marcado, las imágenes subidas se renombrarán al publicar o actualizar la entrada.',
+        'Save changes' => 'Guardar cambios',
+        'Bulk rename' => 'Renombrar en masa',
+        'Renames the featured image files of all posts to the slug of each post title, with progress.' => 'Renombra los archivos de la imagen destacada de todas las entradas al slug del título, con progreso.',
+        'Preparing...' => 'Preparando...',
+        'completed' => 'completado',
+        'Failed to prepare processing.' => 'Error al preparar el procesamiento.',
+        'Failed to process batch.' => 'Error al procesar el lote.',
+        'AJAX request error.' => 'Error en la solicitud AJAX.',
+        'Nothing to process.' => 'Nada para procesar.',
+        'Processed' => 'Procesados',
+        'of' => 'de',
+        'Renamed' => 'Renombrados',
+        'Skipped' => 'Omitidos',
+        'Errors' => 'Errores',
+        'requires WordPress %1$s and PHP %2$s.' => 'requiere WordPress %1$s y PHP %2$s.',
+        'Automated updates via GitHub Releases.' => 'Actualizaciones automáticas mediante GitHub Releases.'
+    );
+
     public function __construct() {
-        add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), [ $this, 'add_settings_link' ] );
-        add_action( 'admin_menu',  [ $this, 'register_settings_page' ] );
-        add_action( 'admin_init',  [ $this, 'register_settings' ] );
-        add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-        add_action( 'wp_ajax_facilitated_routines_prepare_bulk', [ $this, 'ajax_prepare_bulk' ] );
-        add_action( 'wp_ajax_facilitated_routines_process_bulk', [ $this, 'ajax_process_bulk' ] );
-        add_action( 'save_post', [ $this, 'rename_featured_on_save' ], 20, 3 );
+        // Locale bootstrap without .mo files to avoid parser warnings
+        add_action( 'plugins_loaded', array( $this, 'bootstrap_locale' ) );
 
-        add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_for_update' ] );
-        add_filter( 'plugins_api', [ $this, 'plugins_api' ], 10, 3 );
-        add_filter( 'auto_update_plugin', [ $this, 'maybe_auto_update' ], 10, 2 );
+        add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'add_settings_link' ) );
+        add_action( 'admin_menu',  array( $this, 'register_settings_page' ) );
+        add_action( 'admin_init',  array( $this, 'register_settings' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+        add_action( 'wp_ajax_facilitated_routines_prepare_bulk', array( $this, 'ajax_prepare_bulk' ) );
+        add_action( 'wp_ajax_facilitated_routines_process_bulk', array( $this, 'ajax_process_bulk' ) );
+        add_action( 'save_post', array( $this, 'rename_featured_on_save' ), 20, 3 );
 
-        add_action( 'init', [ $this, 'maybe_enable_features' ] );
-        add_action( 'admin_notices', [ $this, 'maybe_conflict_notice' ] );
+        add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
+        add_filter( 'plugins_api', array( $this, 'plugins_api' ), 10, 3 );
+        add_filter( 'auto_update_plugin', array( $this, 'maybe_auto_update' ), 10, 2 );
+
+        add_action( 'init', array( $this, 'maybe_enable_features' ) );
+        add_action( 'admin_notices', array( $this, 'maybe_conflict_notice' ) );
+    }
+
+    public function bootstrap_locale() {
+        $locale = function_exists( 'determine_locale' ) ? determine_locale() : get_locale();
+        self::$locale = $locale ? $locale : 'en_US';
+        add_filter( 'gettext', array( $this, 'inline_translate' ), 20, 3 );
+    }
+
+    public function inline_translate( $translated, $text, $domain ) {
+        if ( $domain !== 'facilitated-routines' ) { return $translated; }
+        if ( strpos( self::$locale, 'pt_BR' ) === 0 && isset( self::$map_pt[ $text ] ) ) {
+            return self::$map_pt[ $text ];
+        }
+        if ( strpos( self::$locale, 'es' ) === 0 && isset( self::$map_es[ $text ] ) ) {
+            return self::$map_es[ $text ];
+        }
+        return $translated;
     }
 
     public function maybe_enable_features() {
@@ -86,7 +123,7 @@ final class Facilitated_Routines {
         }
         $webp = (int) get_option( self::OPTION_KEY_ENABLE_WEBP, 0 );
         if ( $webp ) {
-            add_filter( 'wp_generate_attachment_metadata', [ $this, 'generate_webp_variants' ], 20, 2 );
+            add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_webp_variants' ), 20, 2 );
         }
     }
 
@@ -125,13 +162,13 @@ final class Facilitated_Routines {
                 $ok = $im->writeImage( $dst );
                 $im->clear(); $im->destroy();
                 return (bool) $ok;
-            } catch ( \Exception $e ) { /* ignore */ }
+            } catch ( \Exception $e ) {}
         }
         if ( function_exists( 'imagewebp' ) ) {
             $ext = strtolower( pathinfo( $src, PATHINFO_EXTENSION ) );
             if ( in_array( $ext, array( 'jpg', 'jpeg' ), true ) && function_exists( 'imagecreatefromjpeg' ) ) {
                 $img = @imagecreatefromjpeg( $src );
-            } elseif ( $ext === 'png' and function_exists( 'imagecreatefrompng' ) ) {
+            } elseif ( $ext === 'png' && function_exists( 'imagecreatefrompng' ) ) {
                 $img = @imagecreatefrompng( $src );
                 if ( $img ) {
                     if ( function_exists('imagepalettetotruecolor') ) { @imagepalettetotruecolor( $img ); }
@@ -203,65 +240,105 @@ final class Facilitated_Routines {
             __( 'Facilitated Routines', 'facilitated-routines' ),
             'manage_options',
             'facilitated-routines',
-            [ $this, 'render_settings_page' ]
+            array( $this, 'render_settings_page' )
         );
     }
 
     public function register_settings() {
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_RENAME_ON_UPLOAD, [
+        register_setting( self::OPTION_GROUP, self::OPTION_KEY_RENAME_ON_UPLOAD, array(
             'type' => 'boolean', 'default' => 1, 'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
-        ] );
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_AUTO_UPDATE, [
+        ) );
+        register_setting( self::OPTION_GROUP, self::OPTION_KEY_AUTO_UPDATE, array(
             'type' => 'boolean', 'default' => 1, 'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
-        ] );
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_CREATE_THUMBS, [
+        ) );
+        register_setting( self::OPTION_GROUP, self::OPTION_KEY_CREATE_THUMBS, array(
             'type' => 'boolean', 'default' => 1, 'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
-        ] );
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_ENABLE_OPTIMIZE, [
+        ) );
+        register_setting( self::OPTION_GROUP, self::OPTION_KEY_ENABLE_OPTIMIZE, array(
             'type' => 'boolean', 'default' => 0, 'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
-        ] );
-        register_setting( self::OPTION_GROUP, self::OPTION_KEY_ENABLE_WEBP, [
+        ) );
+        register_setting( self::OPTION_GROUP, self::OPTION_KEY_ENABLE_WEBP, array(
             'type' => 'boolean', 'default' => 0, 'sanitize_callback' => function( $v ){ return (int) (bool) $v; }
-        ] );
+        ) );
 
         add_settings_section( 'fr_main', __( 'Settings', 'facilitated-routines' ), '__return_false', 'facilitated-routines' );
-        add_settings_field( self::OPTION_KEY_RENAME_ON_UPLOAD, __( 'Rename images on upload', 'facilitated-routines' ), [ $this, 'field_checkbox' ], 'facilitated-routines', 'fr_main', [ 'key' => self::OPTION_KEY_RENAME_ON_UPLOAD, 'label' => __( 'When checked, uploaded images will be renamed when the post is published or updated.', 'facilitated-routines' ) ] );
-        add_settings_field( self::OPTION_KEY_CREATE_THUMBS, __( 'Create thumbnails', 'facilitated-routines' ), [ $this, 'field_checkbox' ], 'facilitated-routines', 'fr_main', [ 'key' => self::OPTION_KEY_CREATE_THUMBS, 'label' => __( 'Generate intermediate sizes during upload.', 'facilitated-routines' ) ] );
-        add_settings_field( self::OPTION_KEY_ENABLE_OPTIMIZE, __( 'Optimize images', 'facilitated-routines' ), [ $this, 'field_checkbox' ], 'facilitated-routines', 'fr_main', [ 'key' => self::OPTION_KEY_ENABLE_OPTIMIZE, 'label' => __( 'Enable optimization routines from the included module.', 'facilitated-routines' ) ] );
-        add_settings_field( self::OPTION_KEY_ENABLE_WEBP, __( 'Generate WebP', 'facilitated-routines' ), [ $this, 'field_checkbox' ], 'facilitated-routines', 'fr_main', [ 'key' => self::OPTION_KEY_ENABLE_WEBP, 'label' => __( 'Create .webp copies for original and sizes when possible.', 'facilitated-routines' ) ] );
+
+        add_settings_field(
+            self::OPTION_KEY_RENAME_ON_UPLOAD,
+            __( 'Rename images on upload', 'facilitated-routines' ),
+            array( $this, 'field_checkbox' ),
+            'facilitated-routines', 'fr_main',
+            array( 'key' => self::OPTION_KEY_RENAME_ON_UPLOAD, 'label' => __( 'When checked, uploaded images will be renamed when the post is published or updated.', 'facilitated-routines' ) )
+        );
+        add_settings_field(
+            self::OPTION_KEY_CREATE_THUMBS,
+            __( 'Create thumbnails', 'facilitated-routines' ),
+            array( $this, 'field_checkbox' ),
+            'facilitated-routines', 'fr_main',
+            array( 'key' => self::OPTION_KEY_CREATE_THUMBS, 'label' => __( 'Generate intermediate sizes during upload.', 'facilitated-routines' ) )
+        );
+        add_settings_field(
+            self::OPTION_KEY_ENABLE_OPTIMIZE,
+            __( 'Optimize images', 'facilitated-routines' ),
+            array( $this, 'field_checkbox' ),
+            'facilitated-routines', 'fr_main',
+            array( 'key' => self::OPTION_KEY_ENABLE_OPTIMIZE, 'label' => __( 'Enable optimization routines from the included module.', 'facilitated-routines' ) )
+        );
+        add_settings_field(
+            self::OPTION_KEY_ENABLE_WEBP,
+            __( 'Generate WebP', 'facilitated-routines' ),
+            array( $this, 'field_checkbox' ),
+            'facilitated-routines', 'fr_main',
+            array( 'key' => self::OPTION_KEY_ENABLE_WEBP, 'label' => __( 'Create .webp copies for original and sizes when possible.', 'facilitated-routines' ) )
+        );
     }
 
     public function field_checkbox( $args ) {
-        $key = $args['key']; $label = $args['label']; $val = (int) get_option( $key, 0 );
+        $key = $args['key'];
+        $label = $args['label'];
+        $val = (int) get_option( $key, 0 );
         echo '<label><input type="checkbox" name="'.esc_attr($key).'" value="1" '.checked(1,$val,false).' /> '.esc_html($label).'</label>';
     }
 
     public function enqueue_assets( $hook ) {
         if ( 'settings_page_facilitated-routines' !== $hook ) { return; }
-        wp_register_style( 'facilitated-routines-admin', false, [], FACILITATED_ROUTINES_VERSION );
+        wp_register_style( 'facilitated-routines-admin', false, array(), FACILITATED_ROUTINES_VERSION );
         wp_add_inline_style( 'facilitated-routines-admin', '#fr-progress{display:none;width:100%;background:#f0f0f1;height:18px;border-radius:4px;overflow:hidden;margin-top:8px;border:1px solid #dcdcde}#fr-bar{height:100%;width:0%}#fr-stats{margin-top:6px;font-size:12px;color:#2c3338}#fr-actions{margin:12px 0}' );
         wp_enqueue_style( 'facilitated-routines-admin' );
-        wp_register_script( 'facilitated-routines-admin', false, [ 'jquery' ], FACILITATED_ROUTINES_VERSION, true );
+
+        wp_register_script( 'facilitated-routines-admin', false, array( 'jquery' ), FACILITATED_ROUTINES_VERSION, true );
         wp_enqueue_script( 'facilitated-routines-admin' );
-        wp_localize_script( 'facilitated-routines-admin', 'FRI18N', {
-            'ajaxUrl': admin_url( 'admin-ajax.php' ),
-            'noncePrepare': wp_create_nonce( 'facilitated_routines_prepare' ),
-            'nonceProcess': wp_create_nonce( 'facilitated_routines_process' ),
-            'preparing': __( 'Preparing...', 'facilitated-routines' ),
-            'completed': __( 'completed', 'facilitated-routines' ),
-            'failPrepare': __( 'Failed to prepare processing.', 'facilitated-routines' ),
-            'failBatch': __( 'Failed to process batch.', 'facilitated-routines' ),
-            'failAjax': __( 'AJAX request error.', 'facilitated-routines' ),
-            'nothing': __( 'Nothing to process.', 'facilitated-routines' ),
-            'labels': {
-                'processed': __( 'Processed', 'facilitated-routines' ),
-                'of': __( 'of', 'facilitated-routines' ),
-                'renamed': __( 'Renamed', 'facilitated-routines' ),
-                'skipped': __( 'Skipped', 'facilitated-routines' ),
-                'errors': __( 'Errors', 'facilitated-routines' ),
-            },
-        } );
-        wp_add_inline_script( 'facilitated-routines-admin', "jQuery(function($){let total=0,processed=0,page=1,batch=25,renamed=0,skipped=0,errors=0,running=false;function stats(){return FRI18N.labels.processed+': '+processed+' '+FRI18N.labels.of+' '+total+' | '+FRI18N.labels.renamed+': '+renamed+' | '+FRI18N.labels.skipped+': '+skipped+' | '+FRI18N.labels.errors+': '+errors;}function update(){const pct=total>0?Math.min(100,Math.round((processed/total)*100)):0;$('#fr-bar').css({width:pct+'%',background:pct===100?'#46b450':'#2271b1'});$('#fr-stats').text(stats());}function processPage(){$.post(FRI18N.ajaxUrl,{action:'facilitated_routines_process_bulk',_ajax_nonce:FRI18N.nonceProcess,page:page,batch:batch}).done(function(resp){if(!resp||!resp.success){finish(FRI18N.failBatch);return;}const d=resp.data||{};processed+=d.processed||0;renamed+=d.renamed||0;skipped+=d.skipped||0;errors+=d.errors||0;update();if(d.done||processed>=total){finish();return;}page++;setTimeout(processPage,120);}).fail(function(){finish(FRI18N.failAjax);});}function finish(msg){running=false;$('#fr-run').prop('disabled',false);if(msg){alert(msg);}if(processed>=total){$('#fr-stats').append(' ✔️ '+FRI18N.completed);}}$('#fr-run').on('click',function(e){e.preventDefault();if(running){return;}running=true;$(this).prop('disabled',true);$('#fr-progress').show();$('#fr-bar').css({width:'0%'});$('#fr-stats').text(FRI18N.preparing);$.post(FRI18N.ajaxUrl,{action:'facilitated_routines_prepare_bulk',_ajax_nonce:FRI18N.noncePrepare}).done(function(resp){if(!resp||!resp.success){finish(FRI18N.failPrepare);return;}const d=resp.data||{};total=d.total||0;batch=d.batch||batch;processed=0;page=1;renamed=0;skipped=0;errors=0;update();if(total===0){finish(FRI18N.nothing);return;}processPage();}).fail(function(){finish(FRI18N.failAjax);});});});" );
+
+        wp_localize_script( 'facilitated-routines-admin', 'FRI18N', array(
+            'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+            'noncePrepare' => wp_create_nonce( 'facilitated_routines_prepare' ),
+            'nonceProcess' => wp_create_nonce( 'facilitated_routines_process' ),
+            'preparing'    => __( 'Preparing...', 'facilitated-routines' ),
+            'completed'    => __( 'completed', 'facilitated-routines' ),
+            'failPrepare'  => __( 'Failed to prepare processing.', 'facilitated-routines' ),
+            'failBatch'    => __( 'Failed to process batch.', 'facilitated-routines' ),
+            'failAjax'     => __( 'AJAX request error.', 'facilitated-routines' ),
+            'nothing'      => __( 'Nothing to process.', 'facilitated-routines' ),
+            'labels'       => array(
+                'processed' => __( 'Processed', 'facilitated-routines' ),
+                'of'        => __( 'of', 'facilitated-routines' ),
+                'renamed'   => __( 'Renamed', 'facilitated-routines' ),
+                'skipped'   => __( 'Skipped', 'facilitated-routines' ),
+                'errors'    => __( 'Errors', 'facilitated-routines' ),
+            ),
+        ) );
+
+        $inline_js = <<<'JS'
+jQuery(function($){
+  let total=0,processed=0,page=1,batch=25,renamed=0,skipped=0,errors=0,running=false;
+  function stats(){return FRI18N.labels.processed+': '+processed+' '+FRI18N.labels.of+' '+total+' | '+FRI18N.labels.renamed+': '+renamed+' | '+FRI18N.labels.skipped+': '+skipped+' | '+FRI18N.labels.errors+': '+errors;}
+  function update(){const pct=total>0?Math.min(100,Math.round((processed/total)*100)):0;$('#fr-bar').css({width:pct+'%',background:pct===100?'#46b450':'#2271b1'});$('#fr-stats').text(stats());}
+  function processPage(){$.post(FRI18N.ajaxUrl,{action:'facilitated_routines_process_bulk',_ajax_nonce:FRI18N.nonceProcess,page:page,batch:batch}).done(function(resp){if(!resp||!resp.success){finish(FRI18N.failBatch);return;}const d=resp.data||{};processed+=d.processed||0;renamed+=d.renamed||0;skipped+=d.skipped||0;errors+=d.errors||0;update();if(d.done||processed>=total){finish();return;}page++;setTimeout(processPage,120);}).fail(function(){finish(FRI18N.failAjax);});}
+  function finish(msg){running=false;$('#fr-run').prop('disabled',false);if(msg){alert(msg);}if(processed>=total){$('#fr-stats').append(' ✔️ '+FRI18N.completed);}}
+  $('#fr-run').on('click',function(e){e.preventDefault();if(running){return;}running=true;$(this).prop('disabled',true);$('#fr-progress').show();$('#fr-bar').css({width:'0%'});$('#fr-stats').text(FRI18N.preparing);$.post(FRI18N.ajaxUrl,{action:'facilitated_routines_prepare_bulk',_ajax_nonce:FRI18N.noncePrepare}).done(function(resp){if(!resp||!resp.success){finish(FRI18N.failPrepare);return;}const d=resp.data||{};total=d.total||0;batch=d.batch||batch;processed=0;page=1;renamed=0;skipped=0;errors=0;update();if(total===0){finish(FRI18N.nothing);return;}processPage();}).fail(function(){finish(FRI18N.failAjax);});});
+});
+JS;
+        wp_add_inline_script( 'facilitated-routines-admin', $inline_js );
     }
 
     public function render_settings_page() {
@@ -269,7 +346,11 @@ final class Facilitated_Routines {
         <div class="wrap">
             <h1><?php echo esc_html__( 'Facilitated Routines', 'facilitated-routines' ); ?></h1>
             <form method="post" action="options.php">
-                <?php settings_fields( self::OPTION_GROUP ); do_settings_sections( 'facilitated-routines' ); submit_button( esc_html__( 'Save changes', 'facilitated-routines' ) ); ?>
+                <?php
+                settings_fields( self::OPTION_GROUP );
+                do_settings_sections( 'facilitated-routines' );
+                submit_button( esc_html__( 'Save changes', 'facilitated-routines' ) );
+                ?>
             </form>
             <hr />
             <h2><?php echo esc_html__( 'Bulk rename', 'facilitated-routines' ); ?></h2>
@@ -289,7 +370,12 @@ final class Facilitated_Routines {
         global $wpdb;
         $allowed_status = array('publish','future','draft','pending','private');
         $placeholders = implode(',', array_fill(0, count($allowed_status), '%s'));
-        $sql = "SELECT COUNT(DISTINCT p.ID) FROM {$wpdb->posts} p INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = %s WHERE p.post_status IN ({$placeholders})";
+        $sql = "
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = %s
+            WHERE p.post_status IN ({$placeholders})
+        ";
         $params = array_merge( array('_thumbnail_id'), $allowed_status );
         $total = (int) $wpdb->get_var( $wpdb->prepare( $sql, $params ) );
         $batch = max( 5, min( 50, apply_filters( 'facilitated_routines_bulk_batch', 25 ) ) );
@@ -370,8 +456,8 @@ final class Facilitated_Routines {
         $cached = get_site_transient( $cache_key );
         if ( $cached && is_array( $cached ) ) { return $cached; }
         $url = sprintf( 'https://api.github.com/repos/%s/%s/releases/latest', self::GITHUB_OWNER, self::GITHUB_REPO );
-        $headers = [ 'Accept' => 'application/vnd.github+json', 'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url() ];
-        $response = wp_remote_get( $url, [ 'headers' => $headers, 'timeout' => 15 ] );
+        $headers = array( 'Accept' => 'application/vnd.github+json', 'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url() );
+        $response = wp_remote_get( $url, array( 'headers' => $headers, 'timeout' => 15 ) );
         if ( is_wp_error( $response ) ) { return null; }
         $code = (int) wp_remote_retrieve_response_code( $response );
         if ( $code !== 200 ) { return null; }
@@ -384,14 +470,15 @@ final class Facilitated_Routines {
             foreach ( $data['assets'] as $asset ) {
                 if ( ! empty( $asset['browser_download_url'] ) && is_string( $asset['browser_download_url'] ) ) {
                     $name = isset( $asset['name'] ) ? (string) $asset['name'] : '';
-                    if ( $name == 'facilitated-routines.zip' or (substr(strtolower($asset['browser_download_url']), -4) == '.zip') ) {
-                        $package = $asset['browser_download_url']; break;
+                    if ( $name === 'facilitated-routines.zip' || ( substr( strtolower( $asset['browser_download_url'] ), -4 ) === '.zip' ) ) {
+                        $package = $asset['browser_download_url'];
+                        break;
                     }
                 }
             }
         }
-        if ( $package == '' and ! empty( $data['zipball_url'] ) ) { $package = (string) $data['zipball_url']; }
-        $release = [ 'version' => $version, 'package' => $package, 'url' => isset( $data['html_url'] ) ? (string) $data['html_url'] : '', 'body' => isset( $data['body'] ) ? (string) $data['body'] : '' ];
+        if ( $package === '' && ! empty( $data['zipball_url'] ) ) { $package = (string) $data['zipball_url']; }
+        $release = array( 'version' => $version, 'package' => $package, 'url' => isset( $data['html_url'] ) ? (string) $data['html_url'] : '', 'body' => isset( $data['body'] ) ? (string) $data['body'] : '' );
         set_site_transient( $cache_key, $release, HOUR_IN_SECONDS );
         return $release;
     }
@@ -402,7 +489,7 @@ final class Facilitated_Routines {
         if ( ! $release || empty( $release['version'] ) ) { return $transient; }
         if ( version_compare( $release['version'], FACILITATED_ROUTINES_VERSION, '<=' ) ) { return $transient; }
         $plugin_file = plugin_basename( __FILE__ );
-        $obj = (object) [
+        $obj = (object) array(
             'slug'        => 'facilitated-routines',
             'plugin'      => $plugin_file,
             'new_version' => $release['version'],
@@ -410,7 +497,7 @@ final class Facilitated_Routines {
             'requires'    => FACILITATED_ROUTINES_MIN_WP,
             'url'         => 'https://github.com/' . self::GITHUB_OWNER . '/' . self::GITHUB_REPO,
             'package'     => $release['package'],
-        ];
+        );
         $transient->response[ $plugin_file ] = $obj;
         return $transient;
     }
@@ -420,18 +507,20 @@ final class Facilitated_Routines {
         if ( empty( $args->slug ) || $args->slug !== 'facilitated-routines' ) { return $res; }
         $release = $this->get_latest_release();
         if ( ! $release ) { return $res; }
-        $info = (object) [
+        $info = (object) array(
             'name'          => __( 'Facilitated Routines', 'facilitated-routines' ),
             'slug'          => 'facilitated-routines',
-            'version'       => $release['version'] ?: FACILITATED_ROUTINES_VERSION,
+            'version'       => $release['version'] ? $release['version'] : FACILITATED_ROUTINES_VERSION,
             'author'        => '<a href="https://lucasferrazseo.com">Lucas Ferraz SEO</a>',
             'homepage'      => 'https://github.com/' . self::GITHUB_OWNER . '/' . self::GITHUB_REPO,
             'requires'      => FACILITATED_ROUTINES_MIN_WP,
             'tested'        => get_bloginfo( 'version' ),
             'requires_php'  => FACILITATED_ROUTINES_MIN_PHP,
             'download_link' => $release['package'],
-            'sections'      => [ 'description' => wp_kses_post( nl2br( $release['body'] ?: __( 'Automated updates via GitHub Releases.', 'facilitated-routines' ) ) ), ],
-        ];
+            'sections'      => array(
+                'description' => wp_kses_post( nl2br( $release['body'] ? $release['body'] : __( 'Automated updates via GitHub Releases.', 'facilitated-routines' ) ) ),
+            ),
+        );
         return $info;
     }
 
