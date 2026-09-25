@@ -1,33 +1,49 @@
-# Facilitated Routines
+**English** · [Português (Brasil)](README.pt-BR.md)
 
-Repositório reservado para um plugin de WordPress para automatizar
-tarefas repetitivas e otimizar a manutenção do site.
+# Facilitated-Routines
 
-## Status atual
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Este repositório está em fase de planejamento: ainda não há código
-publicado aqui. O nome e a descrição marcam a intenção do projeto,
-não uma versão funcional.
+Placeholder repository for a planned WordPress plugin that automates
+repetitive tasks and makes site maintenance easier. There is no code
+here yet. The name and description state the intent of the project,
+not a working release.
 
-## O que está planejado
+## Contents
 
-Um plugin para reunir, em um único lugar, rotinas de manutenção que
-hoje costumam depender de vários plugins separados ou de edição manual
-do `functions.php` — por exemplo, limpeza programada de revisões e
-lixeira, verificação periódica de links quebrados e outras tarefas
-recorrentes de manutenção de um site WordPress. O escopo exato ainda
-está em definição.
+- [Status](#status)
+- [Planned scope](#planned-scope)
+- [Follow the project](#follow-the-project)
+- [Contributing](#contributing)
+- [Author](#author)
+- [License](#license)
 
-## Quer acompanhar?
+## Status
 
-Acompanhe este repositório para ser avisado quando o código for
-publicado, ou entre em contato pelo [lucasferraz.com](https://lucasferraz.com).
+This repository is in the planning stage. No code has been published
+yet, so there is nothing to install or run.
 
-## Autor
+## Planned scope
 
-[Lucas Ferraz](https://lucasferraz.com) — especialista em SEO, criação de
-sites e SEO para IA, fundador da [Lucas Ferraz SEO](https://lucasferrazseo.com).
+A plugin that brings together, in one place, maintenance routines that
+today usually depend on several separate plugins or on manual edits to
+`functions.php`. Examples are scheduled cleanup of revisions and trash,
+periodic checks for broken links and other recurring maintenance tasks
+for a WordPress site. The exact scope is still being defined.
 
-## Licença
+## Follow the project
 
-MIT — ver [LICENSE](LICENSE).
+Watch this repository to get notified when code is published, or get
+in touch through [lucasferraz.com](https://lucasferraz.com).
+
+## Contributing
+
+Bug reports and suggestions are welcome through [GitHub Issues](https://github.com/LucasFerrazSEO/Facilitated-Routines/issues).
+
+## Author
+
+[Lucas Ferraz](https://lucasferraz.com) is an SEO, website development and Generative Engine Optimization specialist and the founder of [Lucas Ferraz SEO](https://lucasferrazseo.com).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
