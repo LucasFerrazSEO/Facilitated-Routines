@@ -1,6 +1,6 @@
 [English](README.md) · **Português (Brasil)**
 
-# Facilitated-Routines
+# facilitated-routines-wordpress-plugin
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -39,7 +39,7 @@ publicado, ou entre em contato pelo [lucasferraz.com](https://lucasferraz.com).
 
 ## Como contribuir
 
-Relatos de erro e sugestões são bem-vindos pelas [Issues do GitHub](https://github.com/LucasFerrazSEO/Facilitated-Routines/issues).
+Relatos de erro e sugestões são bem-vindos pelas [Issues do GitHub](https://github.com/LucasFerrazSEO/facilitated-routines-wordpress-plugin/issues).
 
 ## Autor
 
